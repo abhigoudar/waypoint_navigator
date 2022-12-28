@@ -1,3 +1,4 @@
 # Message to specify .yaml mission file to load
+# filename should be the absolute path to the mission file
 std_msgs/String filename
 ---

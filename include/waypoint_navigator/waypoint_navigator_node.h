@@ -20,44 +20,58 @@
 #ifndef WAYPOINT_NAVIGATOR_NODE_H
 #define WAYPOINT_NAVIGATOR_NODE_H
 
-#include <glog/logging.h>
-#include <gtest/gtest_prod.h>
-#include <mav_msgs/conversions.h>
-#include <mav_msgs/default_topics.h>
-#include <mav_trajectory_generation/polynomial_optimization_linear.h>
-#include <mav_trajectory_generation/trajectory.h>
-#include <mav_trajectory_generation_ros/ros_conversions.h>
-#include <mav_trajectory_generation_ros/ros_visualization.h>
-#include <nav_msgs/Path.h>
-#include <mav_planning_msgs/PolynomialTrajectory4D.h>
-#include <ros/callback_queue.h>
-#include <ros/ros.h>
-#include <std_srvs/Empty.h>
-#include <stdio.h>
-#include <tf/transform_broadcaster.h>
-#include <tf/transform_listener.h>
-#include <Eigen/Eigen>
-#include <geodetic_utils/geodetic_conv.hpp>
-#include "tf/tf.h"
+#include <cmath>
+#include <cstdio>
+#include <cstdlib>
+#include <ctime>
+#include <fstream>
+#include <iostream>
 
-#include <waypoint_navigator/ExecutePathFromFile.h>
-#include <waypoint_navigator/GoToHeight.h>
-#include <waypoint_navigator/GoToWaypoint.h>
-#include <waypoint_navigator/GoToWaypoints.h>
-#include <waypoint_navigator/GoToPoseWaypoints.h>
+#include <Eigen/Dense>
+#include <glog/logging.h>
+#include <yaml-cpp/yaml.h>
+
+#include <rclcpp/rclcpp.hpp>
+
+#include <mav_msgs/conversions.hpp>
+#include <mav_msgs/default_topics.hpp>
+// #include <mav_trajectory_generation/polynomial_optimization_linear.h>
+// #include <mav_trajectory_generation/trajectory.h>
+// #include <mav_trajectory_generation_ros/ros_conversions.h>
+// #include <mav_trajectory_generation_ros/ros_visualization.h>
+#include <nav_msgs/msg/path.hpp>
+#include <mav_planning_msgs/msg/polynomial_trajectory4_d.hpp>
+
+#include <std_srvs/srv/empty.hpp>
+
+#include "tf2/LinearMath/Quaternion.h"
+// #include <geodetic_utils/geodetic_conv.hpp>
+
+#include <waypoint_navigator/srv/execute_path_from_file.hpp>
+#include <waypoint_navigator/srv/go_to_height.hpp>
+#include <waypoint_navigator/srv/go_to_waypoint.hpp>
+#include <waypoint_navigator/srv/go_to_waypoints.hpp>
+#include <waypoint_navigator/srv/go_to_pose_waypoints.hpp>
+
+#include <visualization_msgs/msg/marker.hpp>
+#include <visualization_msgs/msg/marker_array.hpp>
+
+#include <sensor_msgs/msg/nav_sat_fix.h>
 
 namespace waypoint_navigator {
-class WaypointNavigatorNode {
+class WaypointNavigatorNode :public rclcpp::Node {
  public:
-  WaypointNavigatorNode(const ros::NodeHandle& nh,
-                        const ros::NodeHandle& nh_private);
+  WaypointNavigatorNode(const rclcpp::NodeOptions& options,
+    const std::string& config_file_);
   WaypointNavigatorNode(const WaypointNavigatorNode&) = delete;
   WaypointNavigatorNode& operator=(const WaypointNavigatorNode&) = delete;
   ~WaypointNavigatorNode() = default;
 
  private:
-  // Fetches parameters from the ROS server.
-  void loadParameters();
+  //
+  YAML::Node config;
+  // Fetches config
+  void loadConfig(const std::string&);
   // Read a series of waypoints from file
   // NB: Only call after odometry has been received, as
   // MAV position is set as first point.
@@ -80,50 +94,50 @@ class WaypointNavigatorNode {
 
   // Service callbacks.
   // Starts the execution of a loaded path.
-  bool executePathCallback(std_srvs::Empty::Request& request,
-                           std_srvs::Empty::Response& response);
+  bool executePathCallback(const std::shared_ptr<std_srvs::srv::Empty::Request> request,
+                           std::shared_ptr<std_srvs::srv::Empty::Response> response);
   // Executes a new mission from .yaml file
   bool executePathFromFileCallback(
-      waypoint_navigator::ExecutePathFromFile::Request& request,
-      waypoint_navigator::ExecutePathFromFile::Response& response);
+      const std::shared_ptr<waypoint_navigator::srv::ExecutePathFromFile::Request> request,
+      std::shared_ptr<waypoint_navigator::srv::ExecutePathFromFile::Response> response);
   // Goes to a custom (x,y,z) waypoint.
   bool goToWaypointCallback(
-      waypoint_navigator::GoToWaypoint::Request& request,
-      waypoint_navigator::GoToWaypoint::Response& response);
+      const std::shared_ptr<waypoint_navigator::srv::GoToWaypoint::Request> request,
+      std::shared_ptr<waypoint_navigator::srv::GoToWaypoint::Response> response);
   // Goes to a custom sequence of(x,y,z) waypoints.
   // Note: Does not add intermediate poses.
   bool goToWaypointsCallback(
-      waypoint_navigator::GoToWaypoints::Request& request,
-      waypoint_navigator::GoToWaypoints::Response& response);
+      const std::shared_ptr<waypoint_navigator::srv::GoToWaypoints::Request> request,
+      std::shared_ptr<waypoint_navigator::srv::GoToWaypoints::Response> response);
 
   // Goes to a custom sequence of Pose waypoints, but only yaw is used.
   // Note: Does not add intermediate poses.
   bool goToPoseWaypointsCallback(
-      waypoint_navigator::GoToPoseWaypoints::Request& request,
-      waypoint_navigator::GoToPoseWaypoints::Response& response);
+      const std::shared_ptr<waypoint_navigator::srv::GoToPoseWaypoints::Request> request,
+      std::shared_ptr<waypoint_navigator::srv::GoToPoseWaypoints::Response> response);
 
 
   // Goes to a specific height with current x-y position.
-  bool goToHeightCallback(waypoint_navigator::GoToHeight::Request& request,
-                          waypoint_navigator::GoToHeight::Response& response);
+  bool goToHeightCallback(const std::shared_ptr<waypoint_navigator::srv::GoToHeight::Request> request,
+                          std::shared_ptr<waypoint_navigator::srv::GoToHeight::Response> response);
   // Send a landing command.
-  bool landCallback(std_srvs::Empty::Request& request,
-                    std_srvs::Empty::Response& response);
+  bool landCallback(const std::shared_ptr<std_srvs::srv::Empty::Request> request,
+                    std::shared_ptr<std_srvs::srv::Empty::Response> response);
   // Send a take-off command.
-  bool takeoffCallback(std_srvs::Empty::Request& request,
-                       std_srvs::Empty::Response& response);
+  bool takeoffCallback(const std::shared_ptr<std_srvs::srv::Empty::Request> request,
+                       std::shared_ptr<std_srvs::srv::Empty::Response> response);
   // Cancel mission and keep helicopter in current position
-  bool abortPathCallback(std_srvs::Empty::Request& request,
-                         std_srvs::Empty::Response& response);
+  bool abortPathCallback(const std::shared_ptr<std_srvs::srv::Empty::Request> request,
+                         std::shared_ptr<std_srvs::srv::Empty::Response> response);
   // Publish path rviz markers given most recent odometry measurement.
-  bool visualizePathCallback(std_srvs::Empty::Request& request,
-                             std_srvs::Empty::Response& response);
+  bool visualizePathCallback(const std::shared_ptr<std_srvs::srv::Empty::Request> request,
+                             std::shared_ptr<std_srvs::srv::Empty::Response> response);
   // Publishes a single waypoint to go to if the path mode is 'poses' [5Hz].
-  void poseTimerCallback(const ros::TimerEvent&);
+  void poseTimerCallback();
   // Show path commands published in rviz
-  void visualizationTimerCallback(const ros::TimerEvent&);
+  void visualizationTimerCallback();
 
-  void odometryCallback(const nav_msgs::OdometryConstPtr& odometry_message);
+  void odometryCallback(const nav_msgs::msg::Odometry::SharedPtr odometry_message);
 
   static const double kCommandTimerFrequency;
   // Distance before a waypoint is considered reached [m].
@@ -138,30 +152,28 @@ class WaypointNavigatorNode {
   static const int kPolynomialCoefficients;
 
   // ROS comms.
-  ros::NodeHandle nh_;
-  ros::NodeHandle nh_private_;
 
-  ros::Publisher pose_publisher_;
-  ros::Publisher path_segments_publisher_;
-  ros::Publisher path_points_marker_publisher_;
-  ros::Publisher path_marker_publisher_;
-  ros::Publisher polynomial_publisher_;
+  rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pose_publisher_;
+  rclcpp::Publisher<mav_planning_msgs::msg::PolynomialTrajectory4D>::SharedPtr path_segments_publisher_;
+  rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr path_points_marker_publisher_;
+  rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr path_marker_publisher_;
+  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr polynomial_publisher_;
 
-  ros::Subscriber odometry_subscriber_;
+  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odometry_subscriber_;
 
-  ros::ServiceServer visualize_service_;
-  ros::ServiceServer start_service_;
-  ros::ServiceServer takeoff_service_;
-  ros::ServiceServer land_service_;
-  ros::ServiceServer abort_path_service_;
-  ros::ServiceServer new_path_service_;
-  ros::ServiceServer waypoint_service_;
-  ros::ServiceServer waypoints_service_;
-  ros::ServiceServer pose_waypoints_service_;
-  ros::ServiceServer height_service_;
+  rclcpp::Service<std_srvs::srv::Empty>::SharedPtr visualize_service_;
+  rclcpp::Service<std_srvs::srv::Empty>::SharedPtr start_service_;
+  rclcpp::Service<std_srvs::srv::Empty>::SharedPtr takeoff_service_;
+  rclcpp::Service<std_srvs::srv::Empty>::SharedPtr land_service_;
+  rclcpp::Service<std_srvs::srv::Empty>::SharedPtr abort_path_service_;
+  rclcpp::Service<waypoint_navigator::srv::ExecutePathFromFile>::SharedPtr new_path_service_;
+  rclcpp::Service<waypoint_navigator::srv::GoToWaypoint>::SharedPtr waypoint_service_;
+  rclcpp::Service<waypoint_navigator::srv::GoToWaypoints>::SharedPtr waypoints_service_;
+  rclcpp::Service<waypoint_navigator::srv::GoToPoseWaypoints>::SharedPtr pose_waypoints_service_;
+  rclcpp::Service<waypoint_navigator::srv::GoToHeight>::SharedPtr height_service_;
 
-  ros::Timer command_timer_;
-  ros::Timer visualization_timer_;
+  rclcpp::TimerBase::SharedPtr command_timer_;
+  rclcpp::TimerBase::SharedPtr visualization_timer_;
 
   // Parameters.
   // GPS/ENU coordinates.
@@ -186,7 +198,7 @@ class WaypointNavigatorNode {
   double landing_height_;
 
   // Geodetic coordinate conversion (from lat/lon to Cartesian ENU).
-  geodetic_converter::GeodeticConverter geodetic_converter_;
+//   geodetic_converter::GeodeticConverter geodetic_converter_;
 
   bool got_odometry_;
   mav_msgs::EigenOdometry odometry_;
@@ -196,16 +208,16 @@ class WaypointNavigatorNode {
   std::vector<mav_msgs::EigenTrajectoryPoint> coarse_waypoints_;
 
   // Polynomial trajectory markers.
-  visualization_msgs::MarkerArray markers_;
+  visualization_msgs::msg::MarkerArray markers_;
 
   // Path execution state (for pose publishing).
   size_t current_leg_;
 
   // Path vertices and segments.
-  mav_trajectory_generation::Trajectory polynomial_trajectory_;
-  mav_trajectory_generation::Vertex::Vector polynomial_vertices_;
-  mav_trajectory_generation::Trajectory yaw_trajectory_;
-  mav_trajectory_generation::Vertex::Vector yaw_vertices_;
+//   mav_trajectory_generation::Trajectory polynomial_trajectory_;
+//   mav_trajectory_generation::Vertex::Vector polynomial_vertices_;
+//   mav_trajectory_generation::Trajectory yaw_trajectory_;
+//   mav_trajectory_generation::Vertex::Vector yaw_vertices_;
 
   // Callback number for command_timer_.
   unsigned int timer_counter_;
