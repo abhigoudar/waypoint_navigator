@@ -62,16 +62,17 @@ namespace waypoint_navigator {
 class WaypointNavigatorNode :public rclcpp::Node {
  public:
   WaypointNavigatorNode(const rclcpp::NodeOptions& options,
-    const std::string& config_file_);
+    const std::string& path_file, const std::string& robot_config_file);
   WaypointNavigatorNode(const WaypointNavigatorNode&) = delete;
   WaypointNavigatorNode& operator=(const WaypointNavigatorNode&) = delete;
   ~WaypointNavigatorNode() = default;
 
  private:
   //
-  YAML::Node config;
+  YAML::Node path;
+  YAML::Node robot_config;
   // Fetches config
-  void loadConfig(const std::string&);
+  void loadPath(const std::string&);
   // Read a series of waypoints from file
   // NB: Only call after odometry has been received, as
   // MAV position is set as first point.

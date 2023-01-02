@@ -33,14 +33,14 @@ const int WaypointNavigatorNode::kDimensions = 3;
 const int WaypointNavigatorNode::kPolynomialCoefficients = 10;
 
 WaypointNavigatorNode::WaypointNavigatorNode(const rclcpp::NodeOptions& options,
-  const std::string& config_file)
+  const std::string& path_file, const std::string& robot_config_file)
     : Node("waypoint_navigator_node", options),
       got_odometry_(false)
 {
   //
-  config = YAML::LoadFile(config_file);
+  robot_config = YAML::LoadFile(robot_config_file);
   //
-  loadConfig(config_file);
+  loadPath(path_file);
 
   odometry_subscriber_ = this->create_subscription<nav_msgs::msg::Odometry>(
       "odometry", rclcpp::SensorDataQoS(),
@@ -81,13 +81,18 @@ WaypointNavigatorNode::WaypointNavigatorNode(const rclcpp::NodeOptions& options,
   height_service_ = this->create_service<waypoint_navigator::srv::GoToHeight>(
       "go_to_height", std::bind(&WaypointNavigatorNode::goToHeightCallback, this, _1, _2));
 
+    command_timer_ = this->create_wall_timer
+      (std::chrono::duration<float>(1.0 / kCommandTimerFrequency),
+      std::bind(&WaypointNavigatorNode::poseTimerCallback, this));
+    command_timer_->cancel();
+
   // Wait until GPS reference parameters are initialized.
   // while (!geodetic_converter_.isInitialised() && coordinate_type_ == "gps") {
   //   LOG_FIRST_N(INFO, 1) << "Waiting for GPS reference parameters...";
 
-  //   double latitude = config["gps_ref_latitude"].as<double>();
-  //   double longitude = config["gps_ref_longitude"].as<double>();
-  //   double altitude = config["gps_ref_altitude"].as<double>();
+  //   double latitude = path["gps_ref_latitude"].as<double>();
+  //   double longitude = path["gps_ref_longitude"].as<double>();
+  //   double altitude = path["gps_ref_altitude"].as<double>();
 
   //  geodetic_converter_.initialiseReference(latitude, longitude, altitude);
   //  std::this_thread::sleep_for(500ms);
@@ -97,18 +102,21 @@ WaypointNavigatorNode::WaypointNavigatorNode(const rclcpp::NodeOptions& options,
       << "Waypoint navigator ready. Call 'execute_path' service to get going.";
 }
 
-void WaypointNavigatorNode::loadConfig(const std::string& config_file) {
+void WaypointNavigatorNode::loadPath(const std::string& path_file) {
   //
-  coordinate_type_ = config["coordinate_type"].as<std::string>();
-  path_mode_ = config["path_mode"].as<std::string>();
-  heading_mode_ = config["heading_mode"].as<std::string>();
-  reference_speed_ = config["reference_speed"].as<double>();
-  reference_acceleration_ = config["reference_acceleration"].as<double>();
-  takeoff_height_ = config["takeoff_height"].as<double>();
-  landing_height_ = config["landing_height"].as<double>();
-  mav_name_ = config["mav_name"].as<std::string>();
-  frame_id_ = config["frame_id"].as<std::string>();
-  intermediate_poses_ = config["intermediate_poses"].as<bool>();
+  RCLCPP_INFO(this->get_logger(), ": Loading path:[%s]", path_file.c_str());
+  path = YAML::LoadFile(path_file);
+  //
+  coordinate_type_ = path["coordinate_type"].as<std::string>();
+  path_mode_ = path["path_mode"].as<std::string>();
+  heading_mode_ = path["heading_mode"].as<std::string>();
+  reference_speed_ = path["reference_speed"].as<double>();
+  reference_acceleration_ = path["reference_acceleration"].as<double>();
+  takeoff_height_ = path["takeoff_height"].as<double>();
+  landing_height_ = path["landing_height"].as<double>();
+  // mav_name_ = robot_config["mav_name"].as<std::string>();
+  frame_id_ = robot_config["world_frame"].as<std::string>();
+  intermediate_poses_ = path["intermediate_poses"].as<bool>();
   
   if (coordinate_type_ == "gps" || coordinate_type_ == "enu") {
   } else {
@@ -129,7 +137,7 @@ void WaypointNavigatorNode::loadConfig(const std::string& config_file) {
   }
 
   if (intermediate_poses_) {
-    intermediate_pose_separation_ = config["intermediate_pose_separation"].as<double>();
+    intermediate_pose_separation_ = path["intermediate_pose_separation"].as<double>();
     LOG(INFO) << "intermediate_pose_separation:" << intermediate_pose_separation_;
   }
 }
@@ -141,12 +149,12 @@ bool WaypointNavigatorNode::loadPathFromFile() {
   std::vector<double> height;
   std::vector<double> heading;
   //
-  easting = config["easting"].as<std::vector<double>>();
-  northing = config["northing"].as<std::vector<double>>();
-  height = config["height"].as<std::vector<double>>();
+  easting = path["easting"].as<std::vector<double>>();
+  northing = path["northing"].as<std::vector<double>>();
+  height = path["height"].as<std::vector<double>>();
 
   if (heading_mode_ == "manual"){
-    heading = config["heading"].as<std::vector<double>>();
+    heading = path["heading"].as<std::vector<double>>();
   }
 
   // Check for valid trajectory inputs.
@@ -335,10 +343,7 @@ void WaypointNavigatorNode::createTrajectory() {
 
 void WaypointNavigatorNode::publishCommands() {
   if (path_mode_ == "poses") {
-
-    // command_timer_ =
-    //     nh_.createTimer(ros::Duration(1.0 / kCommandTimerFrequency),
-    //                     &WaypointNavigatorNode::poseTimerCallback, this);
+    command_timer_->reset();
   } else if (path_mode_ == "polynomial") {
     // createTrajectory();
     // // Publish the trajectory directly to the trajectory sampler.
@@ -364,6 +369,7 @@ bool WaypointNavigatorNode::executePathCallback(
     std::shared_ptr<std_srvs::srv::Empty::Response> response) {
   CHECK(got_odometry_)
       << "No odometry received yet, can't start path following.";
+  RCLCPP_INFO(this->get_logger(), ": Received request for execute path.");
   command_timer_->cancel();
   current_leg_ = 0;
   timer_counter_ = 0;
@@ -718,13 +724,35 @@ int main(int argc, char** argv) {
   // Start the logging.
   google::InitGoogleLogging(argv[0]);
   FLAGS_logtostderr = 1;
-  // Initialize ROS, start node.
-  rclcpp::init(argc, argv);
-  rclcpp::NodeOptions options;
-  std::string config_file = "";
-  auto wp_nav_node = std::make_shared<waypoint_navigator::WaypointNavigatorNode>
-    (options, config_file);
-  rclcpp::spin(wp_nav_node);
+  //
+  if(argc < 2)
+  {
+      LOG(INFO) << "No config file provided.";
+  }
+  else
+  {
+
+      char* path_config = argv[1];
+      char* robot_config = argv[2];
+      // Check if config file exists  
+      if(path_config != NULL && robot_config != NULL)
+      {
+        LOG(INFO) << "Path config file provided:" << path_config;
+        LOG(INFO) << "Robot config file provided:" << robot_config;
+        rclcpp::init(argc, argv);
+        rclcpp::NodeOptions options;
+        auto wp_nav_node = std::make_shared<waypoint_navigator::WaypointNavigatorNode>
+          (options, path_config, robot_config);
+        rclcpp::spin(wp_nav_node);
+      } 
+      else
+      {
+          if(path_config == NULL)
+              LOG(INFO) << "File: not found:" << path_config;
+          if(robot_config == NULL)
+              LOG(INFO) << "File: not found:" << robot_config;
+      }
+  }
   rclcpp::shutdown();
   return 0;
 }
