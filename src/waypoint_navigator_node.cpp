@@ -43,7 +43,7 @@ WaypointNavigatorNode::WaypointNavigatorNode(const rclcpp::NodeOptions& options,
   loadPath(path_file);
 
   odometry_subscriber_ = this->create_subscription<nav_msgs::msg::Odometry>(
-      "odometry", rclcpp::SensorDataQoS(),
+      "odometry_source", rclcpp::SensorDataQoS(),
       std::bind(&WaypointNavigatorNode::odometryCallback, this, _1));
   pose_publisher_ = this->create_publisher<geometry_msgs::msg::PoseStamped>(
       mav_msgs::default_topics::COMMAND_POSE, rclcpp::SystemDefaultsQoS());
