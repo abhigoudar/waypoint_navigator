@@ -11,7 +11,6 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
-find_package(rosidl_default_generators REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(mav_msgs REQUIRED)
@@ -20,11 +19,8 @@ find_package(mav_planning_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
-find_package(visualization_msgs REQUIRED)
 find_package(yaml-cpp REQUIRED)
 
-find_package(mav_visualization REQUIRED)
-find_package(mav_trajectory_generation REQUIRED)
 find_package(mav_trajectory_generation_ros REQUIRED)
 
 find_package(eigen3_cmake_module REQUIRED)
@@ -42,9 +38,6 @@ set(DEPENDENCIES
   nav_msgs
   tf2
   std_srvs
-  visualization_msgs
-  mav_visualization
-  mav_trajectory_generation
   mav_trajectory_generation_ros
 )
 
