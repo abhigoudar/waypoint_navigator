@@ -22,6 +22,8 @@ find_package(nav_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(yaml-cpp REQUIRED)
+
+find_package(mav_visualization REQUIRED)
 find_package(mav_trajectory_generation REQUIRED)
 find_package(mav_trajectory_generation_ros REQUIRED)
 
@@ -41,6 +43,7 @@ set(DEPENDENCIES
   tf2
   std_srvs
   visualization_msgs
+  mav_visualization
   mav_trajectory_generation
   mav_trajectory_generation_ros
 )
