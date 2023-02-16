@@ -22,6 +22,8 @@ find_package(nav_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(yaml-cpp REQUIRED)
+find_package(mav_trajectory_generation REQUIRED)
+find_package(mav_trajectory_generation_ros REQUIRED)
 
 find_package(eigen3_cmake_module REQUIRED)
 find_package(Eigen3)
@@ -39,6 +41,8 @@ set(DEPENDENCIES
   tf2
   std_srvs
   visualization_msgs
+  mav_trajectory_generation
+  mav_trajectory_generation_ros
 )
 
 set(srv_files

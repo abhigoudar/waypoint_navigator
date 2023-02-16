@@ -28,8 +28,8 @@ const double WaypointNavigatorNode::kCommandTimerFrequency = 5.0;
 const double WaypointNavigatorNode::kWaypointAchievementDistance = 0.5;
 const double WaypointNavigatorNode::kIntermediatePoseTolerance = 0.1;
 const int WaypointNavigatorNode::kDimensions = 3;
-// const int WaypointNavigatorNode::kDerivativeToOptimize =
-//     mav_trajectory_generation::derivative_order::ACCELERATION;
+const int WaypointNavigatorNode::kDerivativeToOptimize =
+    mav_trajectory_generation::derivative_order::ACCELERATION;
 const int WaypointNavigatorNode::kPolynomialCoefficients = 10;
 
 WaypointNavigatorNode::WaypointNavigatorNode(const rclcpp::NodeOptions& options,
@@ -114,7 +114,7 @@ void WaypointNavigatorNode::loadPath(const std::string& path_file) {
   reference_acceleration_ = path["reference_acceleration"].as<double>();
   takeoff_height_ = path["takeoff_height"].as<double>();
   landing_height_ = path["landing_height"].as<double>();
-  // mav_name_ = robot_config["mav_name"].as<std::string>();
+  mav_name_ = "";//robot_config["mav_name"].as<std::string>();
   frame_id_ = robot_config["world_frame"].as<std::string>();
   intermediate_poses_ = path["intermediate_poses"].as<bool>();
   
@@ -123,7 +123,6 @@ void WaypointNavigatorNode::loadPath(const std::string& path_file) {
     LOG(FATAL) << ("Unknown coordinate type - please enter 'gps' or 'enu'.");
   }
 
-  assert(path_mode_ != "polynomial" && " Polynomial mode not supported.");
   if (path_mode_ == "poses" || path_mode_ == "polynomial") {
   } else {
     LOG(FATAL) << "Unknown path type - please enter 'poses', or 'trajectory'.";
@@ -278,82 +277,82 @@ void WaypointNavigatorNode::addCurrentOdometryWaypoint() {
 }
 
 void WaypointNavigatorNode::createTrajectory() {
-  // polynomial_vertices_.clear();
-  // polynomial_trajectory_.clear();
-  // yaw_vertices_.clear();
-  // yaw_trajectory_.clear();
-  // deletePolynomialMarkers();
+  polynomial_vertices_.clear();
+  polynomial_trajectory_.clear();
+  yaw_vertices_.clear();
+  yaw_trajectory_.clear();
+  deletePolynomialMarkers();
 
-  // // Create a list of vertices.
-  // for (size_t i = 0; i < coarse_waypoints_.size(); i++) {
-  //   mav_trajectory_generation::Vertex vertex(kDimensions);
-  //   mav_trajectory_generation::Vertex yaw(1);
+  // Create a list of vertices.
+  for (size_t i = 0; i < coarse_waypoints_.size(); i++) {
+    mav_trajectory_generation::Vertex vertex(kDimensions);
+    mav_trajectory_generation::Vertex yaw(1);
 
-  //   // Position.
-  //   if (i == 0 || i == coarse_waypoints_.size() - 1) {
-  //     vertex.makeStartOrEnd(coarse_waypoints_[i].position_W,
-  //                           mav_trajectory_generation::derivative_order::SNAP);
-  //   } else {
-  //     vertex.addConstraint(
-  //         mav_trajectory_generation::derivative_order::POSITION,
-  //         coarse_waypoints_[i].position_W);
-  //   }
-  //   // Yaw.
-  //   if (i != 0) {
-  //     // Check whether to rotate clockwise or counter-clockwise in yaw.
-  //     double yaw_mod = fmod(
-  //         coarse_waypoints_[i].getYaw() - coarse_waypoints_[i - 1].getYaw(),
-  //         2 * M_PI);
-  //     if (yaw_mod < -M_PI) {
-  //       yaw_mod += 2 * M_PI;
-  //     } else if (yaw_mod > M_PI) {
-  //       yaw_mod -= 2 * M_PI;
-  //     }
-  //     coarse_waypoints_[i].setFromYaw(coarse_waypoints_[i - 1].getYaw() +
-  //                                     yaw_mod);
-  //   }
-  //   yaw.addConstraint(mav_trajectory_generation::derivative_order::ORIENTATION,
-  //                     coarse_waypoints_[i].getYaw());
+    // Position.
+    if (i == 0 || i == coarse_waypoints_.size() - 1) {
+      vertex.makeStartOrEnd(coarse_waypoints_[i].position_W,
+                            mav_trajectory_generation::derivative_order::SNAP);
+    } else {
+      vertex.addConstraint(
+          mav_trajectory_generation::derivative_order::POSITION,
+          coarse_waypoints_[i].position_W);
+    }
+    // Yaw.
+    if (i != 0) {
+      // Check whether to rotate clockwise or counter-clockwise in yaw.
+      double yaw_mod = fmod(
+          coarse_waypoints_[i].getYaw() - coarse_waypoints_[i - 1].getYaw(),
+          2 * M_PI);
+      if (yaw_mod < -M_PI) {
+        yaw_mod += 2 * M_PI;
+      } else if (yaw_mod > M_PI) {
+        yaw_mod -= 2 * M_PI;
+      }
+      coarse_waypoints_[i].setFromYaw(coarse_waypoints_[i - 1].getYaw() +
+                                      yaw_mod);
+    }
+    yaw.addConstraint(mav_trajectory_generation::derivative_order::ORIENTATION,
+                      coarse_waypoints_[i].getYaw());
 
-  //   polynomial_vertices_.push_back(vertex);
-  //   yaw_vertices_.push_back(yaw);
-  // }
+    polynomial_vertices_.push_back(vertex);
+    yaw_vertices_.push_back(yaw);
+  }
 
-  // // Optimize the polynomial trajectory.
-  // // Position.
-  // std::vector<double> segment_times;
-  // segment_times =
-  //     estimateSegmentTimes(polynomial_vertices_, reference_speed_,
-  //                          reference_acceleration_);
+  // Optimize the polynomial trajectory.
+  // Position.
+  std::vector<double> segment_times;
+  segment_times =
+      estimateSegmentTimes(polynomial_vertices_, reference_speed_,
+                           reference_acceleration_);
 
-  // mav_trajectory_generation::PolynomialOptimization<kPolynomialCoefficients>
-  //     opt(kDimensions);
-  // opt.setupFromVertices(polynomial_vertices_, segment_times,
-  //                       kDerivativeToOptimize);
-  // opt.solveLinear();
-  // opt.getTrajectory(&polynomial_trajectory_);
-  // // Yaw.
-  // mav_trajectory_generation::PolynomialOptimization<kPolynomialCoefficients>
-  //     yaw_opt(1);
-  // yaw_opt.setupFromVertices(yaw_vertices_, segment_times,
-  //                           kDerivativeToOptimize);
-  // yaw_opt.solveLinear();
-  // yaw_opt.getTrajectory(&yaw_trajectory_);
+  mav_trajectory_generation::PolynomialOptimization<kPolynomialCoefficients>
+      opt(kDimensions);
+  opt.setupFromVertices(polynomial_vertices_, segment_times,
+                        kDerivativeToOptimize);
+  opt.solveLinear();
+  opt.getTrajectory(&polynomial_trajectory_);
+  // Yaw.
+  mav_trajectory_generation::PolynomialOptimization<kPolynomialCoefficients>
+      yaw_opt(1);
+  yaw_opt.setupFromVertices(yaw_vertices_, segment_times,
+                            kDerivativeToOptimize);
+  yaw_opt.solveLinear();
+  yaw_opt.getTrajectory(&yaw_trajectory_);
 }
 
 void WaypointNavigatorNode::publishCommands() {
   if (path_mode_ == "poses") {
     command_timer_->reset();
   } else if (path_mode_ == "polynomial") {
-    // createTrajectory();
-    // // Publish the trajectory directly to the trajectory sampler.
-    // mav_planning_msgs::msg::PolynomialTrajectory4D msg;
-    // mav_trajectory_generation::Trajectory traj_with_yaw;
-    // polynomial_trajectory_.getTrajectoryWithAppendedDimension(yaw_trajectory_,
-    //                                                           &traj_with_yaw);
-    // mav_trajectory_generation::trajectoryToPolynomialTrajectoryMsg(
-    //     traj_with_yaw, &msg);
-    // path_segments_publisher_->publish(msg);
+    createTrajectory();
+    // Publish the trajectory directly to the trajectory sampler.
+    mav_planning_msgs::msg::PolynomialTrajectory4D msg;
+    mav_trajectory_generation::Trajectory traj_with_yaw;
+    polynomial_trajectory_.getTrajectoryWithAppendedDimension(yaw_trajectory_,
+                                                              &traj_with_yaw);
+    mav_trajectory_generation::trajectoryToPolynomialTrajectoryMsg(
+        traj_with_yaw, &msg);
+    path_segments_publisher_->publish(msg);
   }
 }
 
@@ -572,10 +571,10 @@ bool WaypointNavigatorNode::abortPathCallback(
   const std::shared_ptr<std_srvs::srv::Empty::Request> request,
   std::shared_ptr<std_srvs::srv::Empty::Response> response) {
   coarse_waypoints_.clear();
-  // polynomial_trajectory_.clear();
-  // polynomial_vertices_.clear();
-  // yaw_trajectory_.clear();
-  // yaw_vertices_.clear();
+  polynomial_trajectory_.clear();
+  polynomial_vertices_.clear();
+  yaw_trajectory_.clear();
+  yaw_vertices_.clear();
   visualization_timer_->cancel();
 
   // Stop sending commands to the controller.
@@ -597,9 +596,9 @@ bool WaypointNavigatorNode::visualizePathCallback(
   CHECK(got_odometry_) << "No odometry received yet, can't visualize the path.";
   CHECK(loadPathFromFile()) << "Path could not be loaded!";
 
-  // if (path_mode_ == "polynomial") {
-  //   createTrajectory();
-  // }
+  if (path_mode_ == "polynomial") {
+    createTrajectory();
+  }
 
   visualization_timer_ = this->create_wall_timer(100ms,
     std::bind(&WaypointNavigatorNode::visualizationTimerCallback, this));
@@ -701,14 +700,14 @@ void WaypointNavigatorNode::visualizationTimerCallback() {
   path_points_marker_publisher_->publish(path_points_marker);
   path_marker_publisher_->publish(path_marker);
 
-  // if (path_mode_ == "polynomial") {
-  //   mav_trajectory_generation::Trajectory traj_with_yaw;
-  //   polynomial_trajectory_.getTrajectoryWithAppendedDimension(yaw_trajectory_,
-  //                                                             &traj_with_yaw);
-  //   mav_trajectory_generation::drawMavTrajectory(traj_with_yaw, 1.0, frame_id_,
-  //                                                &markers_);
-  //   polynomial_publisher_->publish(markers_);
-  // }
+  if (path_mode_ == "polynomial") {
+    mav_trajectory_generation::Trajectory traj_with_yaw;
+    polynomial_trajectory_.getTrajectoryWithAppendedDimension(yaw_trajectory_,
+                                                              &traj_with_yaw);
+    mav_trajectory_generation::drawMavTrajectory(traj_with_yaw, 1.0, frame_id_,
+                                                 &markers_);
+    polynomial_publisher_->publish(markers_);
+  }
 }
 
 void WaypointNavigatorNode::odometryCallback(

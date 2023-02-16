@@ -35,10 +35,10 @@
 
 #include <mav_msgs/conversions.hpp>
 #include <mav_msgs/default_topics.hpp>
-// #include <mav_trajectory_generation/polynomial_optimization_linear.h>
-// #include <mav_trajectory_generation/trajectory.h>
-// #include <mav_trajectory_generation_ros/ros_conversions.h>
-// #include <mav_trajectory_generation_ros/ros_visualization.h>
+#include <mav_trajectory_generation/polynomial_optimization_linear.h>
+#include <mav_trajectory_generation/trajectory.h>
+#include <mav_trajectory_generation_ros/ros_conversions.h>
+#include <mav_trajectory_generation_ros/ros_visualization.h>
 #include <nav_msgs/msg/path.hpp>
 #include <mav_planning_msgs/msg/polynomial_trajectory4_d.hpp>
 
@@ -215,10 +215,10 @@ class WaypointNavigatorNode :public rclcpp::Node {
   size_t current_leg_;
 
   // Path vertices and segments.
-//   mav_trajectory_generation::Trajectory polynomial_trajectory_;
-//   mav_trajectory_generation::Vertex::Vector polynomial_vertices_;
-//   mav_trajectory_generation::Trajectory yaw_trajectory_;
-//   mav_trajectory_generation::Vertex::Vector yaw_vertices_;
+  mav_trajectory_generation::Trajectory polynomial_trajectory_;
+  mav_trajectory_generation::Vertex::Vector polynomial_vertices_;
+  mav_trajectory_generation::Trajectory yaw_trajectory_;
+  mav_trajectory_generation::Vertex::Vector yaw_vertices_;
 
   // Callback number for command_timer_.
   unsigned int timer_counter_;
