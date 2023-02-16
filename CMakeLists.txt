@@ -11,35 +11,14 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
-find_package(rclcpp REQUIRED)
-find_package(geometry_msgs REQUIRED)
-find_package(mav_msgs REQUIRED)
-find_package(tf2 REQUIRED)
-find_package(mav_planning_msgs REQUIRED)
-find_package(sensor_msgs REQUIRED)
-find_package(nav_msgs REQUIRED)
-find_package(std_srvs REQUIRED)
 find_package(yaml-cpp REQUIRED)
-
-find_package(mav_trajectory_generation_ros REQUIRED)
-
-find_package(eigen3_cmake_module REQUIRED)
-find_package(Eigen3)
-
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(glog REQUIRED libglog)
 
-set(DEPENDENCIES
-  rclcpp
-  geometry_msgs
-  mav_msgs
-  mav_planning_msgs
-  sensor_msgs
-  nav_msgs
-  tf2
-  std_srvs
-  mav_trajectory_generation_ros
-)
+find_package(rclcpp REQUIRED)
+find_package(visualization_msgs REQUIRED)
+find_package(mav_trajectory_generation_ros REQUIRED)
+
 
 set(srv_files
   "srv/ExecutePathFromFile.srv"
@@ -62,8 +41,15 @@ include_directories(
 
 add_executable(waypoint_navigator_node 
                src/waypoint_navigator_node.cpp)
-ament_target_dependencies(waypoint_navigator_node ${DEPENDENCIES})
-target_link_libraries(waypoint_navigator_node glog yaml-cpp)
+ament_target_dependencies(waypoint_navigator_node
+  rclcpp
+  visualization_msgs
+  mav_trajectory_generation_ros)
+
+target_link_libraries(waypoint_navigator_node 
+  glog
+  yaml-cpp 
+  ${mav_trajectory_generation_ros_LIBRARIES})
 rosidl_target_interfaces(waypoint_navigator_node ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 install(TARGETS waypoint_navigator_node
@@ -101,7 +87,6 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-ament_export_dependencies(eigen3_cmake_module)
 ament_export_include_directories(include)
 ament_export_dependencies(rosidl_default_runtime)
 ament_package()
