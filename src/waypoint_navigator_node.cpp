@@ -417,6 +417,9 @@ void WaypointNavigatorNode::goToWaypointSubCallback(const geometry_msgs::msg::Po
   vwp.position_W.x() = msg->pose.position.x;
   vwp.position_W.y() = msg->pose.position.y;
   vwp.position_W.z() = takeoff_height_;
+  LOG(INFO) << "Goal waypoint: x:" << vwp.position_W.x() << " y:" << vwp.position_W.y() 
+    << " z:" << vwp.position_W.z(); 
+
   if (heading_mode_ == "zero") {
     vwp.setFromYaw(0.0);
   } else if (sqrt(pow(msg->pose.position.y - odometry_.position_W.y(), 2) +
