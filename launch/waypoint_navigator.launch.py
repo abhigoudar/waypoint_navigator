@@ -18,7 +18,7 @@ def generate_launch_description():
         ),
         #
         DeclareLaunchArgument(
-            name="path_config_file",
+            name="waypoint_navigator_config_file",
             default_value=PathJoinSubstitution(
                 [FindPackageShare("waypoint_navigator"), "paths", "trajectory_simple_enu.yaml"]
             )
@@ -28,9 +28,9 @@ def generate_launch_description():
             name="waypoint_navigator_node",
             package="waypoint_navigator",
             executable="waypoint_navigator_node",
-            output="screen",
-            emulate_tty=True,
-            arguments=[LaunchConfiguration("path_config_file"),
+            # output="screen",
+            # emulate_tty=True,
+            arguments=[LaunchConfiguration("waypoint_navigator_config_file"),
                 LaunchConfiguration("robot_config_file")],
         )
     ])

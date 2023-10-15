@@ -40,6 +40,7 @@
 #include <mav_trajectory_generation_ros/ros_conversions.h>
 #include <mav_trajectory_generation_ros/ros_visualization.h>
 #include <nav_msgs/msg/path.hpp>
+#include <geometry_msgs/msg/pose_stamped.hpp>
 #include <mav_planning_msgs/msg/polynomial_trajectory4_d.hpp>
 
 #include <std_srvs/srv/empty.hpp>
@@ -105,6 +106,9 @@ class WaypointNavigatorNode :public rclcpp::Node {
   bool goToWaypointCallback(
       const std::shared_ptr<waypoint_navigator::srv::GoToWaypoint::Request> request,
       std::shared_ptr<waypoint_navigator::srv::GoToWaypoint::Response> response);
+  // Goes to a custom (x,y,z) waypoint.
+  void goToWaypointSubCallback(
+      const std::shared_ptr<geometry_msgs::msg::PoseStamped> request);
   // Goes to a custom sequence of(x,y,z) waypoints.
   // Note: Does not add intermediate poses.
   bool goToWaypointsCallback(
@@ -161,6 +165,7 @@ class WaypointNavigatorNode :public rclcpp::Node {
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr polynomial_publisher_;
 
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odometry_subscriber_;
+  rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr waypoint_subscriber_;
 
   rclcpp::Service<std_srvs::srv::Empty>::SharedPtr visualize_service_;
   rclcpp::Service<std_srvs::srv::Empty>::SharedPtr start_service_;

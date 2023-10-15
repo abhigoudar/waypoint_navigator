@@ -4,7 +4,7 @@
 coordinate_type: 'enu'
 
 # Method of sending commands to controller ('poses'/'polynomial' trajectory)
-path_mode: 'poses'
+path_mode: 'polynomial'
 
 # Limit distance between poses ('true'/'false')
 intermediate_poses: true

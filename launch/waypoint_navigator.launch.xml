@@ -1,11 +1,11 @@
 <launch>
     <arg name="odometry_topic"  default="odometry/in"/>
     <arg name="command_pose"  default="command/pose"/>
-    <arg name="path_config" default="$(find-pkg-share mav_px4)/paths/trajectory_simple_enu.yaml"/>
-    <arg name="robot_config" default="$(find-pkg-share mav_px4)/configs/robot_config.yaml"/>
+    <arg name="waypoint_navigator_config_file" default="$(find-pkg-share mav_px4)/paths/trajectory_simple_enu.yaml"/>
+    <arg name="robot_config_file" default="$(find-pkg-share mav_px4)/configs/robot_config.yaml"/>
 
     <node pkg="waypoint_navigator" exec="waypoint_navigator_node"
-        output="screen" args="$(var path_config) $(var robot_config)">
+        output="screen" args="$(var waypoint_navigator_config_file) $(var robot_config_file)">
         <remap from="odometry" to="$(var odometry_topic)" />
         <remap from="command/pose" to="$(var command_pose)"/>
     </node>

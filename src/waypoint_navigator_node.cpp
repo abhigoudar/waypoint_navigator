@@ -80,6 +80,9 @@ WaypointNavigatorNode::WaypointNavigatorNode(const rclcpp::NodeOptions& options,
       "go_to_pose_waypoints", std::bind(&WaypointNavigatorNode::goToPoseWaypointsCallback, this, _1, _2));
   height_service_ = this->create_service<waypoint_navigator::srv::GoToHeight>(
       "go_to_height", std::bind(&WaypointNavigatorNode::goToHeightCallback, this, _1, _2));
+  waypoint_subscriber_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
+      "go_to_waypoint_subscriber", rclcpp::SensorDataQoS(),
+      std::bind(&WaypointNavigatorNode::goToWaypointSubCallback, this, _1));
 
     command_timer_ = this->create_wall_timer
       (std::chrono::duration<float>(1.0 / kCommandTimerFrequency),
@@ -401,6 +404,39 @@ bool WaypointNavigatorNode::executePathFromFileCallback(
   return true;
 }
 
+void WaypointNavigatorNode::goToWaypointSubCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
+  coarse_waypoints_.clear();
+  current_leg_ = 0;
+  timer_counter_ = 0;
+  command_timer_->cancel();
+
+  addCurrentOdometryWaypoint();
+
+  // Add the new waypoint.
+  mav_msgs::EigenTrajectoryPoint vwp;
+  vwp.position_W.x() = msg->pose.position.x;
+  vwp.position_W.y() = msg->pose.position.y;
+  vwp.position_W.z() = takeoff_height_;
+  if (heading_mode_ == "zero") {
+    vwp.setFromYaw(0.0);
+  } else if (sqrt(pow(msg->pose.position.y - odometry_.position_W.y(), 2) +
+                  pow(msg->pose.position.x - odometry_.position_W.x(), 2)) < 0.05) {
+    vwp.orientation_W_B = odometry_.orientation_W_B;
+  } else {
+    vwp.setFromYaw(atan2(msg->pose.position.y - odometry_.position_W.y(),
+                        msg->pose.position.x - odometry_.position_W.x()));
+  }
+  coarse_waypoints_.push_back(vwp);
+
+  // Limit the maximum distance between waypoints.
+  if (intermediate_poses_) {
+    addIntermediateWaypoints();
+  }
+
+  publishCommands();
+  LOG(INFO) << "Going to a new waypoint...";
+}
+
 bool WaypointNavigatorNode::goToWaypointCallback(
     const std::shared_ptr<waypoint_navigator::srv::GoToWaypoint::Request> request,
     std::shared_ptr<waypoint_navigator::srv::GoToWaypoint::Response> response) {
@@ -617,13 +653,14 @@ void WaypointNavigatorNode::poseTimerCallback() {
     if (current_leg_ == 0) {
       LOG(INFO) << "Going to first waypoint... ";
     } else {
-      LOG(INFO) << "Leg " << current_leg_ << " of "
-                << coarse_waypoints_.size() - 1 << " completed!";
+      // LOG(INFO) << "Leg " << current_leg_ << " of "
+      //           << coarse_waypoints_.size() - 1 << " completed!";
     }
     current_leg_++;
   }
 
   geometry_msgs::msg::PoseStamped pose;
+  pose.header.frame_id = frame_id_;
   pose.header.stamp = this->get_clock()->now();
   pose.pose.position.x = coarse_waypoints_[current_leg_].position_W.x();
   pose.pose.position.y = coarse_waypoints_[current_leg_].position_W.y();
