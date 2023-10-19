@@ -423,9 +423,7 @@ bool WaypointNavigatorNode::loadPathFromPkgCB(
     //
     abortPathCallback(empty_request, empty_response);
     // Change: Absolute path of file needs to be given  
-    std::ifstream filename(request->filename.data.c_str());
-    if(!filename.good());
-    loadPath(request->filename.data);
+    loadPath(path_file);
     //
     visualizePathCallback(empty_request, empty_response);
     // executePathCallback(empty_request, empty_response);
