@@ -99,7 +99,7 @@ class WaypointNavigatorNode :public rclcpp::Node {
   bool executePathCallback(const std::shared_ptr<std_srvs::srv::Empty::Request> request,
                            std::shared_ptr<std_srvs::srv::Empty::Response> response);
   // Executes a new mission from .yaml file
-  bool executePathFromFileCallback(
+  bool loadPathFromFileCB(
       const std::shared_ptr<waypoint_navigator::srv::ExecutePathFromFile::Request> request,
       std::shared_ptr<waypoint_navigator::srv::ExecutePathFromFile::Response> response);
   // Goes to a custom (x,y,z) waypoint.

@@ -3,6 +3,7 @@
  * Copyright (c) 2017, Inkyu Sa, ASL, ETH Zurich, Switzerland
  * Copyright (c) 2016, Raghav Khanna, ASL, ETH Zurich, Switzerland
  * Copyright (c) 2015, Enric Galceran, ASL, ETH Zurich, Switzerland
+ * Copyright (c) 2023, Abhishek Goudar, LSY, UofT, Canada
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -70,8 +71,8 @@ WaypointNavigatorNode::WaypointNavigatorNode(const rclcpp::NodeOptions& options,
   abort_path_service_ = this->create_service<std_srvs::srv::Empty>( "abort_path",
     std::bind(&WaypointNavigatorNode::abortPathCallback, this, _1, _2));
   new_path_service_ = this->create_service<waypoint_navigator::srv::ExecutePathFromFile>(
-      "execute_path_from_file",
-      std::bind(&WaypointNavigatorNode::executePathFromFileCallback, this, _1, _2));
+      "load_path_from_file",
+      std::bind(&WaypointNavigatorNode::loadPathFromFileCB, this, _1, _2));
   waypoint_service_ = this->create_service<waypoint_navigator::srv::GoToWaypoint>(
       "go_to_waypoint", std::bind(&WaypointNavigatorNode::goToWaypointCallback, this, _1, _2));
   waypoints_service_ = this->create_service<waypoint_navigator::srv::GoToWaypoints>(
@@ -88,6 +89,10 @@ WaypointNavigatorNode::WaypointNavigatorNode(const rclcpp::NodeOptions& options,
       (std::chrono::duration<float>(1.0 / kCommandTimerFrequency),
       std::bind(&WaypointNavigatorNode::poseTimerCallback, this));
     command_timer_->cancel();
+  
+    visualization_timer_ = this->create_wall_timer(100ms,
+      std::bind(&WaypointNavigatorNode::visualizationTimerCallback, this));
+    visualization_timer_->cancel();
 
   // Wait until GPS reference parameters are initialized.
   // while (!geodetic_converter_.isInitialised() && coordinate_type_ == "gps") {
@@ -108,7 +113,14 @@ WaypointNavigatorNode::WaypointNavigatorNode(const rclcpp::NodeOptions& options,
 void WaypointNavigatorNode::loadPath(const std::string& path_file) {
   //
   RCLCPP_INFO(this->get_logger(), ": Loading path:[%s]", path_file.c_str());
-  path = YAML::LoadFile(path_file);
+  //
+  try{
+    path = YAML::LoadFile(path_file);
+  }
+  catch(const std::exception& e){
+    LOG(WARNING) << "Loadpath failed:" << e.what();
+    return;
+  }
   //
   coordinate_type_ = path["coordinate_type"].as<std::string>();
   path_mode_ = path["path_mode"].as<std::string>();
@@ -117,7 +129,6 @@ void WaypointNavigatorNode::loadPath(const std::string& path_file) {
   reference_acceleration_ = path["reference_acceleration"].as<double>();
   takeoff_height_ = path["takeoff_height"].as<double>();
   landing_height_ = path["landing_height"].as<double>();
-  mav_name_ = "";//robot_config["mav_name"].as<std::string>();
   frame_id_ = robot_config["world_frame"].as<std::string>();
   intermediate_poses_ = path["intermediate_poses"].as<bool>();
   
@@ -372,24 +383,26 @@ bool WaypointNavigatorNode::executePathCallback(
   CHECK(got_odometry_)
       << "No odometry received yet, can't start path following.";
   RCLCPP_INFO(this->get_logger(), ": Received request for execute path.");
-  command_timer_->cancel();
+
+  if(!command_timer_->is_canceled())
+    command_timer_->cancel();
+
   current_leg_ = 0;
   timer_counter_ = 0;
 
   CHECK(loadPathFromFile()) << "Path could not be loaded!";
 
   // Display the path markers in rviz.
-  auto empty_request = std::make_shared<std_srvs::srv::Empty::Request>();
-  auto empty_response = std::make_shared<std_srvs::srv::Empty::Response>();
-
-  visualizePathCallback(empty_request, empty_response);
+  // auto empty_request = std::make_shared<std_srvs::srv::Empty::Request>();
+  // auto empty_response = std::make_shared<std_srvs::srv::Empty::Response>();
+  // visualizePathCallback(empty_request, empty_response);
 
   publishCommands();
   LOG(INFO) << "Starting path execution...";
   return true;
 }
 
-bool WaypointNavigatorNode::executePathFromFileCallback(
+bool WaypointNavigatorNode::loadPathFromFileCB(
     const std::shared_ptr<waypoint_navigator::srv::ExecutePathFromFile::Request> request,
     std::shared_ptr<waypoint_navigator::srv::ExecutePathFromFile::Response> response) {
   // Stop executing the current path.
@@ -400,7 +413,10 @@ bool WaypointNavigatorNode::executePathFromFileCallback(
   // Change: Absolute path of file needs to be given  
   std::ifstream filename(request->filename.data.c_str());
   if(!filename.good());
-  executePathCallback(empty_request, empty_response);
+  loadPath(request->filename.data);
+  //
+  visualizePathCallback(empty_request, empty_response);
+  // executePathCallback(empty_request, empty_response);
   return true;
 }
 
@@ -408,7 +424,15 @@ void WaypointNavigatorNode::goToWaypointSubCallback(const geometry_msgs::msg::Po
   coarse_waypoints_.clear();
   current_leg_ = 0;
   timer_counter_ = 0;
-  command_timer_->cancel();
+
+  auto empty_request = std::make_shared<std_srvs::srv::Empty::Request>();
+  auto empty_response = std::make_shared<std_srvs::srv::Empty::Response>();
+  abortPathCallback(empty_request, empty_response);
+  // Force to be in pose mode for idscrete waypoints for now
+  path_mode_ = "poses";
+
+  if(!command_timer_->is_canceled())
+    command_timer_->cancel();
 
   addCurrentOdometryWaypoint();
 
@@ -446,7 +470,9 @@ bool WaypointNavigatorNode::goToWaypointCallback(
   coarse_waypoints_.clear();
   current_leg_ = 0;
   timer_counter_ = 0;
-  command_timer_->cancel();
+
+  if(!command_timer_->is_canceled())
+    command_timer_->cancel();
 
   addCurrentOdometryWaypoint();
 
@@ -482,7 +508,9 @@ bool WaypointNavigatorNode::goToWaypointsCallback(
   coarse_waypoints_.clear();
   current_leg_ = 0;
   timer_counter_ = 0;
-  command_timer_->cancel();
+
+  if(!command_timer_->is_canceled())
+    command_timer_->cancel();
 
   addCurrentOdometryWaypoint();
 
@@ -515,8 +543,9 @@ bool WaypointNavigatorNode::goToWaypointsCallback(
     }
   }
   // Display the path markers in rviz.
-  visualization_timer_ = this->create_wall_timer(100ms,
-    std::bind(&WaypointNavigatorNode::visualizationTimerCallback, this));
+  visualization_timer_->reset();
+  // visualization_timer_ = this->create_wall_timer(100ms,
+  //   std::bind(&WaypointNavigatorNode::visualizationTimerCallback, this));
   publishCommands();
   return true;
 }
@@ -527,8 +556,9 @@ bool WaypointNavigatorNode::goToPoseWaypointsCallback(
   coarse_waypoints_.clear();
   current_leg_ = 0;
   timer_counter_ = 0;
-  command_timer_->cancel();
 
+  if(!command_timer_->is_canceled())
+    command_timer_->cancel();
   // Add points to a new path.
   std::vector<geometry_msgs::msg::Pose> waypoints = request->waypoints;
   mav_msgs::EigenTrajectoryPoint vwp;
@@ -560,8 +590,9 @@ bool WaypointNavigatorNode::goToPoseWaypointsCallback(
   {
     LOG(INFO) << coarse_waypoints_.size()<<" waypoints received.";
     // Display the path markers in rviz.
-    visualization_timer_ = this->create_wall_timer(100ms,
-      std::bind(&WaypointNavigatorNode::visualizationTimerCallback, this));
+    // visualization_timer_ = this->create_wall_timer(100ms,
+    //   std::bind(&WaypointNavigatorNode::visualizationTimerCallback, this));
+    visualization_timer_->reset();
     publishCommands();
   }else{
     LOG(INFO) << " Nothing to do because the destination is too close.";
@@ -614,16 +645,21 @@ bool WaypointNavigatorNode::abortPathCallback(
   polynomial_vertices_.clear();
   yaw_trajectory_.clear();
   yaw_vertices_.clear();
-  visualization_timer_->cancel();
+  //
+  if(!visualization_timer_->is_canceled())
+    visualization_timer_->cancel();
 
   // Stop sending commands to the controller.
   if (path_mode_ == "polynomial") {
     auto empty_request = std::make_shared<std_srvs::srv::Empty::Request>();
-    auto client = this->create_client<std_srvs::srv::Empty>(
-        "/" + mav_name_ + "/stop_trajectory_sampling");
+    std::string client_topic = std::string(this->get_namespace()) + "/stop_sampling";
+    // LOG(INFO) << " Stop campling client topic:" << client_topic;
+    auto client = this->create_client<std_srvs::srv::Empty>(client_topic);
+    //
     client->async_send_request(empty_request);
   } else {
-    command_timer_->cancel();
+    if(!command_timer_->is_canceled())
+      command_timer_->cancel();
   }
   LOG(INFO) << "Aborting path execution...";
   return true;
@@ -639,8 +675,6 @@ bool WaypointNavigatorNode::visualizePathCallback(
     createTrajectory();
   }
 
-  visualization_timer_ = this->create_wall_timer(100ms,
-    std::bind(&WaypointNavigatorNode::visualizationTimerCallback, this));
   return true;
 }
 

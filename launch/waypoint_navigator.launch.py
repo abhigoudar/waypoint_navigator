@@ -32,5 +32,6 @@ def generate_launch_description():
             # emulate_tty=True,
             arguments=[LaunchConfiguration("waypoint_navigator_config_file"),
                 LaunchConfiguration("robot_config_file")],
+            # prefix=['xterm -e gdb -ex=r --args'],
         )
     ])
