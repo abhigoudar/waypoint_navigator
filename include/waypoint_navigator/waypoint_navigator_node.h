@@ -49,6 +49,7 @@
 // #include <geodetic_utils/geodetic_conv.hpp>
 
 #include <waypoint_navigator/srv/execute_path_from_file.hpp>
+#include <waypoint_navigator/srv/execute_path_from_pkg.hpp>
 #include <waypoint_navigator/srv/go_to_height.hpp>
 #include <waypoint_navigator/srv/go_to_waypoint.hpp>
 #include <waypoint_navigator/srv/go_to_waypoints.hpp>
@@ -58,6 +59,7 @@
 #include <visualization_msgs/msg/marker_array.hpp>
 
 #include <sensor_msgs/msg/nav_sat_fix.h>
+#include <ament_index_cpp/get_package_share_directory.hpp>
 
 namespace waypoint_navigator {
 class WaypointNavigatorNode :public rclcpp::Node {
@@ -102,6 +104,10 @@ class WaypointNavigatorNode :public rclcpp::Node {
   bool loadPathFromFileCB(
       const std::shared_ptr<waypoint_navigator::srv::ExecutePathFromFile::Request> request,
       std::shared_ptr<waypoint_navigator::srv::ExecutePathFromFile::Response> response);
+  // Executes a new mission from .yaml file
+  bool loadPathFromPkgCB(
+      const std::shared_ptr<waypoint_navigator::srv::ExecutePathFromPkg::Request> request,
+      std::shared_ptr<waypoint_navigator::srv::ExecutePathFromPkg::Response> response);
   // Goes to a custom (x,y,z) waypoint.
   bool goToWaypointCallback(
       const std::shared_ptr<waypoint_navigator::srv::GoToWaypoint::Request> request,
@@ -172,7 +178,8 @@ class WaypointNavigatorNode :public rclcpp::Node {
   rclcpp::Service<std_srvs::srv::Empty>::SharedPtr takeoff_service_;
   rclcpp::Service<std_srvs::srv::Empty>::SharedPtr land_service_;
   rclcpp::Service<std_srvs::srv::Empty>::SharedPtr abort_path_service_;
-  rclcpp::Service<waypoint_navigator::srv::ExecutePathFromFile>::SharedPtr new_path_service_;
+  rclcpp::Service<waypoint_navigator::srv::ExecutePathFromFile>::SharedPtr path_from_file_service_;
+  rclcpp::Service<waypoint_navigator::srv::ExecutePathFromPkg>::SharedPtr path_from_pkg_service_;
   rclcpp::Service<waypoint_navigator::srv::GoToWaypoint>::SharedPtr waypoint_service_;
   rclcpp::Service<waypoint_navigator::srv::GoToWaypoints>::SharedPtr waypoints_service_;
   rclcpp::Service<waypoint_navigator::srv::GoToPoseWaypoints>::SharedPtr pose_waypoints_service_;

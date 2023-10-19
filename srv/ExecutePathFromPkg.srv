@@ -1,0 +1,4 @@
+# Expects path with filename to be present in 'paths' folder of package.
+std_msgs/String package
+std_msgs/String filename
+---

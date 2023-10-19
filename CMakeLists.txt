@@ -11,6 +11,7 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
+find_package(ament_index_cpp REQUIRED)
 find_package(yaml-cpp REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(glog REQUIRED libglog)
@@ -21,6 +22,7 @@ find_package(mav_trajectory_generation_ros REQUIRED)
 
 
 set(srv_files
+  "srv/ExecutePathFromPkg.srv"
   "srv/ExecutePathFromFile.srv"
   "srv/GoToHeight.srv"
   "srv/GoToPoseWaypoints.srv"
@@ -30,7 +32,7 @@ set(srv_files
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   ${srv_files}
-  DEPENDENCIES std_msgs geometry_msgs
+  DEPENDENCIES std_msgs geometry_msgs ament_index_cpp
   ADD_LINTER_TESTS
 )
 

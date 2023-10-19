@@ -20,6 +20,7 @@
 
 #include <waypoint_navigator/waypoint_navigator_node.h>
 
+
 namespace waypoint_navigator {
 //
 using namespace std::placeholders;
@@ -70,9 +71,12 @@ WaypointNavigatorNode::WaypointNavigatorNode(const rclcpp::NodeOptions& options,
     std::bind(&WaypointNavigatorNode::landCallback, this, _1, _2));
   abort_path_service_ = this->create_service<std_srvs::srv::Empty>( "abort_path",
     std::bind(&WaypointNavigatorNode::abortPathCallback, this, _1, _2));
-  new_path_service_ = this->create_service<waypoint_navigator::srv::ExecutePathFromFile>(
+  path_from_file_service_ = this->create_service<waypoint_navigator::srv::ExecutePathFromFile>(
       "load_path_from_file",
       std::bind(&WaypointNavigatorNode::loadPathFromFileCB, this, _1, _2));
+  path_from_pkg_service_ = this->create_service<waypoint_navigator::srv::ExecutePathFromPkg>(
+      "load_path_from_pkg",
+      std::bind(&WaypointNavigatorNode::loadPathFromPkgCB, this, _1, _2));
   waypoint_service_ = this->create_service<waypoint_navigator::srv::GoToWaypoint>(
       "go_to_waypoint", std::bind(&WaypointNavigatorNode::goToWaypointCallback, this, _1, _2));
   waypoints_service_ = this->create_service<waypoint_navigator::srv::GoToWaypoints>(
@@ -400,6 +404,36 @@ bool WaypointNavigatorNode::executePathCallback(
   publishCommands();
   LOG(INFO) << "Starting path execution...";
   return true;
+}
+
+bool WaypointNavigatorNode::loadPathFromPkgCB(
+    const std::shared_ptr<waypoint_navigator::srv::ExecutePathFromPkg::Request> request,
+    std::shared_ptr<waypoint_navigator::srv::ExecutePathFromPkg::Response> response) {
+
+  std::string agent_dir = ament_index_cpp::get_package_share_directory(request->package.data);
+  std::string path_file = agent_dir + "/paths/" + request->filename.data;
+  RCLCPP_INFO(this->get_logger(), "Request path:[%s]", path_file.c_str());
+  //
+  std::ifstream infile(path_file.c_str());
+  if(infile.good())
+  {
+    // Stop executing the current path.
+    auto empty_request = std::make_shared<std_srvs::srv::Empty::Request>();
+    auto empty_response = std::make_shared<std_srvs::srv::Empty::Response>();
+    //
+    abortPathCallback(empty_request, empty_response);
+    // Change: Absolute path of file needs to be given  
+    std::ifstream filename(request->filename.data.c_str());
+    if(!filename.good());
+    loadPath(request->filename.data);
+    //
+    visualizePathCallback(empty_request, empty_response);
+    // executePathCallback(empty_request, empty_response);
+    return true;
+  }else{
+    RCLCPP_WARN(this->get_logger(), "Path not found:[%s]", path_file.c_str());
+    return false;
+  }
 }
 
 bool WaypointNavigatorNode::loadPathFromFileCB(
