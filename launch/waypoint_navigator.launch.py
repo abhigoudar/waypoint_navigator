@@ -11,6 +11,10 @@ def generate_launch_description():
     return LaunchDescription([
         # robot config file
         DeclareLaunchArgument(
+            name="use_sim_time",
+            default_value='False'
+        ),
+        DeclareLaunchArgument(
             name="robot_config_file",
             default_value=PathJoinSubstitution(
                 [FindPackageShare("waypoint_navigator"), "configs", "robot_config.yaml"]
@@ -32,6 +36,7 @@ def generate_launch_description():
             # emulate_tty=True,
             arguments=[LaunchConfiguration("waypoint_navigator_config_file"),
                 LaunchConfiguration("robot_config_file")],
+            parameters=[{'use_sim_time' : LaunchConfiguration("use_sim_time")}],
             # prefix=['xterm -e gdb -ex=r --args'],
         )
     ])
