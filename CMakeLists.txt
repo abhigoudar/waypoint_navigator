@@ -12,6 +12,7 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(ament_index_cpp REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
 find_package(yaml-cpp REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(glog REQUIRED libglog)
@@ -45,6 +46,7 @@ add_executable(waypoint_navigator_node
                src/waypoint_navigator_node.cpp)
 ament_target_dependencies(waypoint_navigator_node
   rclcpp
+  ament_index_cpp
   visualization_msgs
   mav_trajectory_generation_ros)
 
