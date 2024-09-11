@@ -51,7 +51,7 @@ WaypointNavigatorNode::WaypointNavigatorNode(const rclcpp::NodeOptions& options,
       mav_msgs::default_topics::COMMAND_POSE, rclcpp::SystemDefaultsQoS());
   path_segments_publisher_ =
       this->create_publisher<mav_planning_msgs::msg::PolynomialTrajectory4D>
-      ("path_segments", rclcpp::SystemDefaultsQoS());
+      ("path_segments_4D", rclcpp::SystemDefaultsQoS());
 
   // Visualization.
   path_points_marker_publisher_ = this->create_publisher<visualization_msgs::msg::Marker>(
